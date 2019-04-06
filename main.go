@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"log"
 	"flag"
+	"encoding/json"
+	"io/ioutil"
 	"github.com/gorilla/websocket"
 	"github.com/gorilla/mux"
 	"github.com/spf13/viper"
@@ -36,6 +38,7 @@ func loadConfig() {
 	var configuration Configuration
 
 	viper.SetConfigName("dashprint")
+	viper.SetConfigType("json")
 	viper.AddConfigPath("$HOME/.local/share")
 
 	if err := viper.ReadInConfig(); err != nil {
@@ -49,6 +52,13 @@ func loadConfig() {
 	}
 
 	loadPrinters(configuration)
+}
+
+func saveConfig() {
+	config := Configuration{}
+
+	b, _ := json.MarshalIndent(config, "", "  ")
+	_ = ioutil.WriteFile("$HOME/.local/share/dashprint", b, 0644)
 }
 
 func handleWebsocket(w http.ResponseWriter, r *http.Request) {
