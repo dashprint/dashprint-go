@@ -56,6 +56,8 @@ func loadConfig() {
 
 func saveConfig() {
 	config := Configuration{}
+	
+	// TODO
 
 	b, _ := json.MarshalIndent(config, "", "  ")
 	_ = ioutil.WriteFile("$HOME/.local/share/dashprint", b, 0644)
