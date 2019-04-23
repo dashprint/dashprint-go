@@ -5,6 +5,7 @@ import (
 	"log"
 	"encoding/json"
 	"io/ioutil"
+	"os/user"
 )
 
 type Configuration struct {
@@ -34,6 +35,7 @@ func loadConfig() {
 }
 
 func saveConfig() {
+	log.Println("Saving configuration...")
 	config := Configuration{}
 
 	config.Default = defaultPrinter
@@ -46,5 +48,15 @@ func saveConfig() {
 	}
 
 	b, _ := json.MarshalIndent(config, "", "  ")
-	_ = ioutil.WriteFile("$HOME/.local/share/dashprint", b, 0644)
+
+	user, err := user.Current()
+	if err != nil {
+		log.Println("Failed to save configuration: ", err)
+		return
+	}
+	err = ioutil.WriteFile(user.HomeDir + "/.local/share/dashprint.json", b, 0644)
+
+	if err != nil {
+		log.Println("Failed to save configuration: ", err)
+	}
 }

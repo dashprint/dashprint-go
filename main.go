@@ -1,11 +1,13 @@
 package main
 
-//go:generate $GOPATH/bin/go-bindata -pkg $GOPACKAGE -o assets.go -prefix web/dist web/dist
+//go:generate $GOPATH/bin/go-bindata -pkg $GOPACKAGE -o assets.go -prefix web/dist web/dist/...
 
 import (
 	"net/http"
 	"log"
 	"flag"
+	"mime"
+	"path"
 	"github.com/gorilla/websocket"
 	"github.com/gorilla/mux"
 )
@@ -54,21 +56,23 @@ func handleWebsocket(w http.ResponseWriter, r *http.Request) {
 }
 
 func serveStatic(w http.ResponseWriter, r *http.Request) {
+	defer r.Body.Close()
 	log.Print("Request: ", *r)
 
-	path := r.URL.Path[1:]
-	if path == "" {
-		path = "index.html";
+	fpath := r.URL.Path[1:]
+	if fpath == "" {
+		fpath = "index.html";
 	}
 
-	data, err := Asset(path)
+	data, err := Asset(fpath)
 	if err != nil {
-		log.Println("Cannot find asset ", path)
+		log.Println("Cannot find asset ", fpath)
 		http.Error(w, "File Not Found", http.StatusNotFound)
 		return
 	}
 
-	contentType := http.DetectContentType(data)
+	ext := path.Ext(fpath)
+	contentType := mime.TypeByExtension(ext)
 	w.Header().Set("Content-Type", contentType)
 	w.Write(data)
 }

@@ -28,6 +28,7 @@ func SetupRouteApiV1(router *mux.Router) {
 }
 
 func discoverPrinters(w http.ResponseWriter, r *http.Request) {
+	defer r.Body.Close()
 	log.Println("Discovering printers...")
 
 	printers := UdevPrinterDiscovery()
@@ -51,17 +52,19 @@ type RestPrinterSettings struct {
 	Height uint `json:"height"`
 	Depth uint `json:"depth"`
 	Stopped bool `json:"stopped"`
+	Connected bool `json:"connected"`
 }
 
 func handleGetPrinters(w http.ResponseWriter, r *http.Request) {
 	printerMutex.RLock()
 	defer printerMutex.RUnlock()
+	defer r.Body.Close()
 
 	jsonData := make(map[string]RestPrinterSettings)
 
 	for uniqueName, printer := range printers {
 		var ps RestPrinterSettings
-		printerSettingsToRest(&ps, printer.PrinterSettings)
+		printerSettingsToRest(&ps, printer)
 		jsonData[uniqueName] = ps
 	}
 
@@ -78,12 +81,13 @@ func handleGetPrinters(w http.ResponseWriter, r *http.Request) {
 func handleGetPrinter(w http.ResponseWriter, r *http.Request) {
 	printerMutex.RLock()
 	defer printerMutex.RUnlock()
+	defer r.Body.Close()
 
 	vars := mux.Vars(r)
 
 	if printer, ok := printers[vars["printerId"]]; ok {
 		var rps RestPrinterSettings
-		printerSettingsToRest(&rps, printer.PrinterSettings)
+		printerSettingsToRest(&rps, printer)
 
 		js, err := json.Marshal(rps)
 		if err != nil {
@@ -99,6 +103,7 @@ func handleGetPrinter(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleSetupPrinter(w http.ResponseWriter, r *http.Request) {
+	defer r.Body.Close()
 	// TODO
 }
 
@@ -112,7 +117,7 @@ func printerSettingsFromRest(t RestPrinterSettings, p *PrinterSettings) {
 	p.Stopped = t.Stopped
 }
 
-func printerSettingsToRest(t* RestPrinterSettings, p PrinterSettings) {
+func printerSettingsToRest(t* RestPrinterSettings, p *Printer) {
 	t.Name = p.Name
 	t.DevicePath = p.DevicePath
 	t.BaudRate = p.BaudRate
@@ -121,9 +126,12 @@ func printerSettingsToRest(t* RestPrinterSettings, p PrinterSettings) {
 	t.Depth = p.PrintArea.Depth
 	t.Stopped = p.Stopped
 	t.Default = defaultPrinter == p.UniqueName
+	t.Connected = p.GetState() == STATE_CONNECTED
 }
 
 func handleAddPrinter(w http.ResponseWriter, r *http.Request) {
+	defer r.Body.Close()
+
 	var t RestPrinterSettings
 	t.BaudRate = 115200
 
@@ -153,34 +161,59 @@ func handleAddPrinter(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleSubmitJob(w http.ResponseWriter, r *http.Request) {
+	defer r.Body.Close()
 	// TODO
 }
 
 func handleModifyJob(w http.ResponseWriter, r *http.Request) {
+	defer r.Body.Close()
 	// TODO
 }
 
 func handleGetJob(w http.ResponseWriter, r *http.Request) {
+	defer r.Body.Close()
 	// TODO
 }
 
 func handleGetPrinterTemperatures(w http.ResponseWriter, r *http.Request) {
+	defer r.Body.Close()
 	// TODO
+	vars := mux.Vars(r)
+
+	if printer, ok := printers[vars["printerId"]]; ok {
+		js := []byte("[]")
+		_ = printer
+
+		// js, err := json.Marshal(rps)
+		// if err != nil {
+		//	http.Error(w, err.Error(), http.StatusInternalServerError)
+		//	return
+		// }
+
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(js)
+	} else {
+		http.NotFound(w, r)
+	}
 }
 
 func handleSetPrinterTemperatures(w http.ResponseWriter, r *http.Request) {
+	defer r.Body.Close()
 	// TODO
 }
 
 func handleListFiles(w http.ResponseWriter, r *http.Request) {
+	defer r.Body.Close()
 	// TODO
 }
 
 func handleDownloadFile(w http.ResponseWriter, r *http.Request) {
+	defer r.Body.Close()
 	// TODO
 }
 
 func handleUploadFile(w http.ResponseWriter, r *http.Request) {
+	defer r.Body.Close()
 	// TODO
 }
 

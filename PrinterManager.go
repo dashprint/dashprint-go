@@ -61,6 +61,9 @@ func addPrinter(ps PrinterSettings) string {
 	if !ps.Stopped {
 		printer.Start()
 	}
+	if defaultPrinter == "" {
+		defaultPrinter = printer.UniqueName
+	}
 
 	return printer.UniqueName
 }
