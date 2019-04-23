@@ -6,11 +6,8 @@ import (
 	"net/http"
 	"log"
 	"flag"
-	"encoding/json"
-	"io/ioutil"
 	"github.com/gorilla/websocket"
 	"github.com/gorilla/mux"
-	"github.com/spf13/viper"
 )
 
 var httpAddr = flag.String("address", ":8181", "HTTP service address")
@@ -30,37 +27,8 @@ func main() {
 
 	err := http.ListenAndServe(*httpAddr, router);
 	if err != nil {
-			log.Fatal("HTTP error: ", err)
+		log.Fatal("HTTP error: ", err)
 	}
-}
-
-func loadConfig() {
-	var configuration Configuration
-
-	viper.SetConfigName("dashprint")
-	viper.SetConfigType("json")
-	viper.AddConfigPath("$HOME/.local/share")
-
-	if err := viper.ReadInConfig(); err != nil {
-		log.Println("Cannot load config file: ", err)
-		return
-	}
-
-	err := viper.Unmarshal(&configuration)
-	if err != nil {
-		log.Println("Unable to decode config file: ", err)
-	}
-
-	loadPrinters(configuration)
-}
-
-func saveConfig() {
-	config := Configuration{}
-	
-	// TODO
-
-	b, _ := json.MarshalIndent(config, "", "  ")
-	_ = ioutil.WriteFile("$HOME/.local/share/dashprint", b, 0644)
 }
 
 func handleWebsocket(w http.ResponseWriter, r *http.Request) {
