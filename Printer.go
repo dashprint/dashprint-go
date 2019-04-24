@@ -246,43 +246,44 @@ func (p *Printer) mainLoop() {
 func kvParse(line string) map[string]string {
 	kv := make(map[string]string)
 	pos := 0
-	
+
 	keyPositions := make([][2]int, 0)
-	
+
 	for {
-		pos = strings.Index(line[pos:], ":")
-		if pos == -1 {
+		npos := strings.Index(line[pos:], ":")
+		if npos == -1 {
 			break
 		}
-		
+
+		pos += npos
 		x := pos-1
-		
+
 		for x >= 0 && !unicode.IsSpace(rune(line[x])) {
 			if line[x] == ':' {
 				goto Ignore;
 			}
-			
+
 			x--
 		}
-		
+
 		keyPositions = append(keyPositions, [2]int{ x+1, pos })
 Ignore:
 		pos++
 	}
-	
+
 	for index, keyPos := range keyPositions {
 		var value string
 		key := line[keyPos[0]:keyPos[1]]
-		
+
 		if index + 1 < len(keyPositions) {
 			value = line[keyPos[1]+1 : keyPositions[index+1][0]-1]
 		} else {
 			value = line[keyPos[1]+1:]
 		}
-		
+
 		kv[key] = value
 	}
-	
+
 	return kv
 }
 
@@ -301,6 +302,9 @@ func (p *Printer) readRoutine(port *os.File) {
 			p.scheduleReconnection()
 			break
 		}
+
+		// Remove NL
+		line = line[:len(line)-1]
 
 		log.Printf("[%s] Read line: %s\n", p.UniqueName, line)
 
@@ -323,11 +327,11 @@ func (p *Printer) scheduleReconnection() {
 
 func gcodeChecksum(line string) uint {
 	var cs uint
-	
+
 	for _, b := range []byte(line) {
 		cs ^= uint(b)
 	}
-	
+
 	return cs & 0xff
 }
 
@@ -337,7 +341,7 @@ func (p *Printer) writeCommand(command string) {
 
 	if err != nil {
 		log.Printf("[%s] Error sending data: %s\n", p.UniqueName, err)
-		// TODO
+		p.port.Close()
 	}
 }
 
@@ -358,6 +362,7 @@ func (p *Printer) readLineWithTimeout(timeout time.Duration) (string, error) {
 
 	if line == nil {
 		p.port.Close()
+		line = <-p.readChannel
 		return "", errors.New("Comm timeout")
 	} else {
 		return *line, nil
@@ -405,7 +410,8 @@ func (p *Printer) sendCommand(command string, callback func(reply []string, err 
 	useLineNumber := cmd != "M110"
 
 	if useLineNumber {
-		command = fmt.Sprintf("N%d %s *%d\n", p.nextLineNo, command, gcodeChecksum(command))
+		command = fmt.Sprintf("N%d %s ", p.nextLineNo, command)
+		command += fmt.Sprintf("*%d\n", gcodeChecksum(command))
 		p.nextLineNo++
 	} else {
 		command = command + "\n"
@@ -424,6 +430,7 @@ Resend:
 	p.writeCommand(command)
 
 	replyLines := make([]string, 0)
+	resend := false
 
 	for {
 		line, err := p.readLineWithTimeout(DATA_TIMEOUT)
@@ -436,10 +443,10 @@ Resend:
 
 		if strings.HasPrefix(line, "Resend:") {
 			// Handle resend
-			lineNo, _ := strconv.ParseInt(line[7:], 10, 0) 
+			lineNo, _ := strconv.ParseInt(strings.TrimSpace(line[7:]), 10, 0)
 
 			if int(lineNo) == (p.nextLineNo-1) {
-				goto Resend
+				resend = true
 			} else {
 				log.Printf("[%s] Cannot handle resend of line %d\n", p.UniqueName, int(lineNo))
 				p.port.Close()
@@ -453,9 +460,13 @@ Resend:
 			replyLines = append(replyLines, line)
 
 			if line == "ok" || strings.HasPrefix(line, "ok ") {
+				if resend {
+					goto Resend
+				}
 				if callback != nil {
 					callback(replyLines, nil)
 				}
+				log.Println("Command done, rcvd OK")
 				break
 			} else {
 				if cmd == "M190" || cmd == "M109" {
@@ -477,7 +488,7 @@ func (p *Printer) doConnect() *os.File {
 		DataBits: 8,
 		StopBits: 1,
 		MinimumReadSize: 1,
-		InterCharacterTimeout: 100,
+		InterCharacterTimeout: 0,
 	}
 
 	port, err := serial.Open(options)
